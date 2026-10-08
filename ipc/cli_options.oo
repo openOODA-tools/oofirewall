@@ -1,0 +1,98 @@
+// # CLI Options Parser
+//
+// Logline: Parses command-line arguments and operational flags for oofirewall execution.
+//
+// Setup: Pure argument vector processor extracting zone names, rule actions, and mode switches.
+//
+// Beats:
+//   1. Declare FirewallOpts configuration structure.
+//   2. Parse firewalld zone and mutation flags (--zone, --add-port, --add-service).
+//   3. Parse rule compilation switches (--list-all, --generate-xml, --generate-nft, --audit).
+//   4. Deliver structured options bundle.
+
+pub type FirewallOpts = struct {
+    zone: String,
+    list_all: Bool,
+    generate_xml: Bool,
+    generate_nft: Bool,
+    audit_mode: Bool,
+    add_port: String,
+    add_service: String,
+    json_mode: Bool,
+    demo: Bool,
+    test_mode: Bool,
+    mcp_mode: Bool,
+    help: Bool,
+    version: Bool
+};
+
+pub fn parse_cli_args(args: List[String]) -> FirewallOpts {
+    let mut zone: String = "public";
+    let mut list_all: Bool = false;
+    let mut generate_xml: Bool = false;
+    let mut generate_nft: Bool = false;
+    let mut audit_mode: Bool = false;
+    let mut add_port: String = "";
+    let mut add_service: String = "";
+    let mut json_mode: Bool = false;
+    let mut demo: Bool = false;
+    let mut test_mode: Bool = false;
+    let mut mcp_mode: Bool = false;
+    let mut help: Bool = false;
+    let mut version: Bool = false;
+
+    let n: Int = list_len(args);
+    let mut i: Int = 0;
+
+    while i < n {
+        let arg: String = list_get(args, i);
+
+        if arg == "-h" || arg == "--help" {
+            help = true;
+        } else if arg == "-v" || arg == "--version" {
+            version = true;
+        } else if arg == "-j" || arg == "--json" {
+            json_mode = true;
+        } else if arg == "-D" || arg == "--demo" {
+            demo = true;
+        } else if arg == "--test" {
+            test_mode = true;
+        } else if arg == "--mcp" {
+            mcp_mode = true;
+        } else if arg == "--list-all" {
+            list_all = true;
+        } else if arg == "--generate-xml" || arg == "--xml" {
+            generate_xml = true;
+        } else if arg == "--generate-nft" || arg == "--nft" {
+            generate_nft = true;
+        } else if arg == "--audit" {
+            audit_mode = true;
+        } else if (arg == "-z" || arg == "--zone") && i + 1 < n {
+            i = i + 1;
+            zone = list_get(args, i);
+        } else if arg == "--add-port" && i + 1 < n {
+            i = i + 1;
+            add_port = list_get(args, i);
+        } else if arg == "--add-service" && i + 1 < n {
+            i = i + 1;
+            add_service = list_get(args, i);
+        }
+        i = i + 1;
+    }
+
+    return FirewallOpts {
+        zone: zone,
+        list_all: list_all,
+        generate_xml: generate_xml,
+        generate_nft: generate_nft,
+        audit_mode: audit_mode,
+        add_port: add_port,
+        add_service: add_service,
+        json_mode: json_mode,
+        demo: demo,
+        test_mode: test_mode,
+        mcp_mode: mcp_mode,
+        help: help,
+        version: version
+    };
+}

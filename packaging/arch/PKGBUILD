@@ -1,9 +1,9 @@
 # Maintainer: openOODA-tools <ops@openooda.org>
 pkgname=oofirewall-bin
 _pkgname=oofirewall
-pkgver=0.1.0
+pkgver=0.2.0
 pkgrel=1
-pkgdesc="Declarative packet filtering coordinator backed by Linux nftables kernel sets."
+pkgdesc="Sovereign declarative packet filtering and firewalld coordinator in pure openOODA."
 arch=('x86_64')
 url="https://github.com/openOODA-tools/oofirewall"
 license=('Apache-2.0')

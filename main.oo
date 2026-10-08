@@ -1,38 +1,63 @@
 // # oofirewall Main Entry Point
 //
-// Logline: Declarative packet filtering coordinator backed by Linux nftables kernel sets.
+// Logline: Sovereign declarative packet filtering, firewalld zone generator, and streaming MCP server.
 //
-// Setup: Demands explicit capability tokens and standard argument list.
+// Setup: Demands explicit capability tokens &FsReadCap, &ProcessCap, and &EnvCap under zero ambient authority.
 //
 // Beats:
-//   1. Parse command-line options and dispatch --help, --version, or --mcp.
-//   2. Execute capability-bounded oofirewall operations.
-//   3. Format and output structured results to standard output.
+//   1. Parse command-line options and dispatch --help, --version, --test, or --mcp.
+//   2. Route synthetic showcase requests for --demo execution.
+//   3. Compile firewalld XML zone definitions or Linux nftables rulesets.
+//   4. Execute security compliance audits and output formatted diagnostics.
+
+import "core/firewall_model.oo";
+import "core/firewalld_generator.oo";
+import "core/nftables_generator.oo";
+import "core/firewall_auditor.oo";
+import "render/render_table.oo";
+import "render/render_json.oo";
+import "ipc/cli_options.oo";
+import "ipc/mcp_server.oo";
+import "anchor.oo";
 
 fn render_help() -> String {
-    return "oofirewall 0.1.0 (openOODA sovereign network & egress)\n"
-        + "usage: oofirewall [options] [ARGUMENTS]...\n\n"
-        + "Declarative packet filtering coordinator backed by Linux nftables kernel sets.\n\n"
-        + "Options:\n"
-        + "  -h, --help           display this help and exit\n"
-        + "  -v, --version        output version information and exit\n"
-        + "      --json           output formatted as JSON Lines\n"
-        + "      --color <WHEN>   colorize output: auto, always, never [default: auto]\n"
-        + "      --theme <NAME>   override active oote palette\n"
-        + "      --mcp            run as Model Context Protocol stdio server\n";
+    return "oofirewall 0.2.0 (openOODA sovereign networking & security)\n"
+        + "usage: oofirewall [options] [--zone ZONE]\n\n"
+        + "Declarative packet filtering coordinator backed by Linux nftables and firewalld.\n\n"
+        + "POSIX & firewalld Options:\n"
+        + "  -z, --zone ZONE       target firewall zone (default: public)\n"
+        + "      --list-all        list all allowed interfaces, services, and ports for zone\n"
+        + "      --generate-xml    generate firewalld XML zone definition\n"
+        + "      --generate-nft    compile declarative Linux nftables ruleset\n"
+        + "      --audit           audit firewall configuration against Fedora Server standards\n"
+        + "      --add-port P/PR   plan port opening mutation (e.g. 8080/tcp)\n"
+        + "      --add-service SVC plan service opening mutation (e.g. cockpit, http)\n"
+        + "  -j, --json            output structured records as JSON\n"
+        + "  -D, --demo            interactive multi-zone firewall showcase\n"
+        + "      --test            execute internal subsystem verification suite\n"
+        + "      --mcp             run as Model Context Protocol JSON-RPC stdio server\n"
+        + "  -v, --version         output version information and exit\n"
+        + "      --help            display this help and exit\n";
 }
 
 fn render_version() -> String {
-    return "oofirewall 0.1.0 (openOODA sovereign network & egress)\n";
+    return "oofirewall 0.2.0 (openOODA sovereign networking & security)\n"
+        + "License: Apache License 2.0 (zero ambient authority)\n"
+        + "Architecture: x86_64 / aarch64 native binary\n";
 }
 
-fn main(args: List[String]) -> Int {
+pub fn main(
+    fr: &FsReadCap,
+    _pr: &ProcessCap,
+    _env: &EnvCap,
+    args: List[String]
+) -> Int {
     let num_args: Int = list_len(args);
     let mut i: Int = 0;
 
     while i < num_args {
         let arg: String = list_get(args, i);
-        if arg == "-h" || arg == "--help" {
+        if arg == "--help" {
             print(render_help());
             return 0;
         }
@@ -40,13 +65,104 @@ fn main(args: List[String]) -> Int {
             print(render_version());
             return 0;
         }
+        if arg == "--test" {
+            if run_all_tests() {
+                print("oofirewall: internal anchor tests PASSED\n");
+                return 0;
+            } else {
+                print("oofirewall: internal anchor tests FAILED\n");
+                return 1;
+            }
+        }
         if arg == "--mcp" {
-            print("{\"jsonrpc\":\"2.0\",\"result\":{\"status\":\"ready\",\"tool\":\"oofirewall\"}}\n");
+            run_mcp_server(fr);
+            return 0;
+        }
+        if arg == "-D" || arg == "--demo" {
+            print(render_demo_showcase());
             return 0;
         }
         i = i + 1;
     }
 
-    print("oofirewall: sovereign capability-bounded utility ready\n");
+    let opts: FirewallOpts = parse_cli_args(args);
+
+    if opts.help {
+        print(render_help());
+        return 0;
+    }
+    if opts.version {
+        print(render_version());
+        return 0;
+    }
+    if opts.demo {
+        print(render_demo_showcase());
+        return 0;
+    }
+
+    let target_z: ZoneConfig = if opts.zone == "trusted" {
+        make_trusted_zone()
+    } else if opts.zone == "drop" {
+        make_drop_zone()
+    } else {
+        make_public_zone()
+    };
+
+    if opts.audit_mode {
+        let mut zones: List[ZoneConfig] = list_new();
+        zones = list_push(zones, target_z);
+        let findings: List[AuditFinding] = audit_firewall_configuration(zones);
+        if opts.json_mode {
+            print(render_audit_report_json(findings));
+        } else {
+            let mut out: String = "=== oofirewall Security Audit Report ===\n";
+            let n_f: Int = list_len(findings);
+            let mut f_i: Int = 0;
+            while f_i < n_f {
+                let f: AuditFinding = list_get(findings, f_i);
+                out = out + "[" + f.severity + "] " + f.check_name + ": " + f.detail + "\n";
+                f_i = f_i + 1;
+            }
+            print(out);
+        }
+        return 0;
+    }
+
+    if opts.generate_xml {
+        print(generate_zone_xml(target_z));
+        return 0;
+    }
+
+    if opts.generate_nft {
+        let mut zones: List[ZoneConfig] = list_new();
+        zones = list_push(zones, target_z);
+        print(generate_nftables_ruleset(zones));
+        return 0;
+    }
+
+    if chars_len(opts.add_port) > 0 {
+        if opts.json_mode {
+            print(render_planned_change_json(opts.zone, "add-port", opts.add_port));
+        } else {
+            print("success (planned: open port " + opts.add_port + " in zone " + opts.zone + ")\n");
+        }
+        return 0;
+    }
+
+    if chars_len(opts.add_service) > 0 {
+        if opts.json_mode {
+            print(render_planned_change_json(opts.zone, "add-service", opts.add_service));
+        } else {
+            print("success (planned: open service " + opts.add_service + " in zone " + opts.zone + ")\n");
+        }
+        return 0;
+    }
+
+    // Default inspection
+    if opts.json_mode {
+        print(render_zone_json(target_z));
+    } else {
+        print(render_zone_status(target_z));
+    }
     return 0;
 }

@@ -1,8 +1,8 @@
 Name:           oofirewall
-Version:        0.1.0
+Version:        0.2.0
 Release:        1%{?dist}
-Summary:        Declarative packet filtering coordinator backed by Linux nftables kernel sets.
-License:        ASL 2.0
+Summary:        Sovereign declarative packet filtering and firewalld coordinator in pure openOODA.
+License:        Apache-2.0
 URL:            https://github.com/openOODA-tools/oofirewall
 Source0:        oofirewall-linux-x86_64
 Source1:        uninstall.sh
@@ -10,9 +10,9 @@ BuildArch:      x86_64
 Requires:       glibc
 
 %description
-oofirewall is a sovereign, capability-bounded FIREWALL CONTROLLER written
-in pure openOODA, featuring zero ambient authority, oote color themes,
-and an MCP stdio server.
+oofirewall is a sovereign declarative packet filtering and firewalld coordinator
+written in pure openOODA, featuring zero ambient authority, firewalld zone
+generation, nftables translation, and a streaming MCP JSON-RPC 2.0 stdio server.
 
 %install
 mkdir -p %{buildroot}/usr/bin
@@ -24,5 +24,5 @@ install -m 0755 %{SOURCE1} %{buildroot}/usr/bin/oofirewall-uninstall
 /usr/bin/oofirewall-uninstall
 
 %changelog
-* Wed Oct 07 2026 openOODA-tools <ops@openooda.org> - 0.1.0-1
-- Initial sovereign blueprint scaffolding
+* Thu Oct 08 2026 openOODA-tools <ops@openooda.org> - 0.2.0-1
+- Elevation to v0.2.0 with firewalld zones, nftables rulesets, and streaming MCP

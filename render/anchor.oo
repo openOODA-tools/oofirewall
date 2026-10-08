@@ -1,0 +1,96 @@
+// # Render Subsystem Anchor
+//
+// Logline: Unit tests for zone status formatting, audit reports, and JSON serialization.
+//
+// Setup: Pure verification of rendering output formats without socket or firewall access.
+//
+// Beats:
+//   1. Verify zone status table formatting.
+//   2. Verify multi-zone demo showcase generation.
+//   3. Verify JSON serialization of zones, audits, and mutation plans.
+//   4. Deliver unified render test execution status.
+
+import "core/firewall_model.oo";
+import "core/firewall_auditor.oo";
+import "render/render_table.oo";
+import "render/render_json.oo";
+
+fn str_contains(s: String, needle: String) -> Bool {
+    let n_len: Int = chars_len(needle);
+    let s_len: Int = chars_len(s);
+    if n_len > s_len {
+        return false;
+    }
+    let mut i: Int = 0;
+    while i + n_len <= s_len {
+        if str_slice(s, i, i + n_len) == needle {
+            return true;
+        }
+        i = i + 1;
+    }
+    return false;
+}
+
+fn test_table_rendering() -> Bool {
+    let z: ZoneConfig = make_public_zone();
+    let status_str: String = render_zone_status(z);
+
+    if !str_contains(status_str, "public (active)") {
+        return false;
+    }
+    if !str_contains(status_str, "22/tcp") || !str_contains(status_str, "9090/tcp") {
+        return false;
+    }
+    if !str_contains(status_str, "ssh") || !str_contains(status_str, "cockpit") {
+        return false;
+    }
+
+    let demo_str: String = render_demo_showcase();
+    if !str_contains(demo_str, "Showcase") || !str_contains(demo_str, "table inet filter") {
+        return false;
+    }
+
+    return true;
+}
+
+fn test_json_rendering() -> Bool {
+    let z: ZoneConfig = make_public_zone();
+    let z_json: String = render_zone_json(z);
+
+    if !str_contains(z_json, "\"name\": \"public\"") {
+        return false;
+    }
+    if !str_contains(z_json, "\"port\": 22") || !str_contains(z_json, "\"protocol\": \"tcp\"") {
+        return false;
+    }
+
+    let mut zones: List[ZoneConfig] = list_new();
+    zones = list_push(zones, z);
+    let all_json: String = render_all_zones_json(zones);
+    if !str_contains(all_json, "zones") || !str_contains(all_json, "ports_count") {
+        return false;
+    }
+
+    let findings: List[AuditFinding] = audit_firewall_configuration(zones);
+    let audit_json: String = render_audit_report_json(findings);
+    if !str_contains(audit_json, "findings") || !str_contains(audit_json, "cockpit_console_service") {
+        return false;
+    }
+
+    let plan_json: String = render_planned_change_json("public", "add-port", "8080/tcp");
+    if !str_contains(plan_json, "planned") || !str_contains(plan_json, "8080/tcp") {
+        return false;
+    }
+
+    return true;
+}
+
+pub fn run_render_tests() -> Bool {
+    if !test_table_rendering() {
+        return false;
+    }
+    if !test_json_rendering() {
+        return false;
+    }
+    return true;
+}

@@ -1,0 +1,88 @@
+// # Render Table Subsystem
+//
+// Logline: Formats firewall zones, allowed ports, and security postures for CLI terminal display.
+//
+// Setup: Pure string formatter producing firewalld-compatible zone inspection outputs.
+//
+// Beats:
+//   1. Format zone name and target status banner.
+//   2. List bound interfaces and active services (ssh, cockpit).
+//   3. List permitted port specifications (e.g. 22/tcp, 9090/tcp).
+//   4. Render interactive firewall showcase demonstration.
+
+import "core/firewall_model.oo";
+import "core/firewalld_generator.oo";
+import "core/nftables_generator.oo";
+
+pub fn render_zone_status(z: ZoneConfig) -> String {
+    let mut out: String = z.name + " (" + (if list_len(z.interfaces) > 0 { "active" } else { "available" }) + ")\n";
+    out = out + "  target: " + z.target + "\n";
+    out = out + "  description: " + z.short_desc + "\n";
+
+    // Interfaces
+    out = out + "  interfaces:";
+    let n_ifaces: Int = list_len(z.interfaces);
+    let mut i: Int = 0;
+    while i < n_ifaces {
+        out = out + " " + list_get(z.interfaces, i);
+        i = i + 1;
+    }
+    out = out + "\n";
+
+    // Sources
+    out = out + "  sources:";
+    let n_sources: Int = list_len(z.sources);
+    let mut s_idx: Int = 0;
+    while s_idx < n_sources {
+        out = out + " " + list_get(z.sources, s_idx);
+        s_idx = s_idx + 1;
+    }
+    out = out + "\n";
+
+    // Services
+    out = out + "  services:";
+    let n_services: Int = list_len(z.services);
+    let mut sv_idx: Int = 0;
+    while sv_idx < n_services {
+        out = out + " " + list_get(z.services, sv_idx);
+        sv_idx = sv_idx + 1;
+    }
+    out = out + "\n";
+
+    // Ports
+    out = out + "  ports:";
+    let n_ports: Int = list_len(z.ports);
+    let mut p_idx: Int = 0;
+    while p_idx < n_ports {
+        let p: PortSpec = list_get(z.ports, p_idx);
+        out = out + " " + p.port.to_string() + "/" + p.protocol;
+        p_idx = p_idx + 1;
+    }
+    out = out + "\n";
+
+    return out;
+}
+
+pub fn render_demo_showcase() -> String {
+    let mut out: String = "=== oofirewall Sovereign Firewall & Packet Inspection Showcase ===\n\n";
+
+    let pub_z: ZoneConfig = make_public_zone();
+    let tr_z: ZoneConfig = make_trusted_zone();
+    let dr_z: ZoneConfig = make_drop_zone();
+
+    out = out + "[1] Zone Inspection (Standard Public):\n";
+    out = out + render_zone_status(pub_z) + "\n";
+
+    out = out + "[2] Declarative firewalld XML Output (/etc/firewalld/zones/public.xml):\n";
+    out = out + generate_zone_xml(pub_z) + "\n";
+
+    let mut all_z: List[ZoneConfig] = list_new();
+    all_z = list_push(all_z, pub_z);
+    all_z = list_push(all_z, tr_z);
+    all_z = list_push(all_z, dr_z);
+
+    out = out + "[3] Compiled Linux nftables Ruleset (inet filter):\n";
+    out = out + generate_nftables_ruleset(all_z) + "\n";
+
+    return out;
+}

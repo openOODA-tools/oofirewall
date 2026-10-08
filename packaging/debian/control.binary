@@ -1,12 +1,9 @@
-Source: oofirewall
+Package: oofirewall
+Version: 0.2.0-1
 Section: utils
 Priority: optional
-Maintainer: openOODA-tools <ops@openooda.org>
-Standards-Version: 4.6.2
-Build-Depends: debhelper-compat (= 13)
-
-Package: oofirewall
 Architecture: amd64
+Maintainer: openOODA-tools <ops@openooda.org>
 Depends: libc6
 Description: Sovereign declarative packet filtering and firewalld coordinator
  Declarative packet filtering coordinator backed by Linux nftables kernel sets.

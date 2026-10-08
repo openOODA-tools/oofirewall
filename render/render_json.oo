@@ -1,0 +1,106 @@
+// # Render JSON Subsystem
+//
+// Logline: Serializes firewall zones, rulesets, and audit reports into RFC 8259 JSON objects.
+//
+// Setup: Pure string formatter emitting machine-readable payloads for MCP AI clients.
+//
+// Beats:
+//   1. Serialize single zone configuration records.
+//   2. Serialize aggregated multi-zone arrays.
+//   3. Serialize security compliance audit findings.
+//   4. Serialize planned firewall mutation manifests.
+
+import "core/firewall_model.oo";
+import "core/firewall_auditor.oo";
+
+fn json_str_escape(s: String) -> String {
+    let n: Int = chars_len(s);
+    let mut out: String = "";
+    let mut i: Int = 0;
+    while i < n {
+        let b: Int = byte_at(s, i);
+        if b == 34 { out = out + "\\\""; }
+        else if b == 92 { out = out + "\\\\"; }
+        else if b == 10 { out = out + "\\n"; }
+        else if b == 9 { out = out + "\\t"; }
+        else if b == 13 { out = out + "\\r"; }
+        else { out = out + char_at(s, i); }
+        i = i + 1;
+    }
+    return out;
+}
+
+pub fn render_zone_json(z: ZoneConfig) -> String {
+    let mut out: String = "{\n"
+        + "  \"name\": \"" + json_str_escape(z.name) + "\",\n"
+        + "  \"target\": \"" + json_str_escape(z.target) + "\",\n"
+        + "  \"description\": \"" + json_str_escape(z.short_desc) + "\",\n"
+        + "  \"interfaces\": [";
+
+    let n_ifaces: Int = list_len(z.interfaces);
+    let mut i: Int = 0;
+    while i < n_ifaces {
+        out = out + "\"" + json_str_escape(list_get(z.interfaces, i)) + "\"";
+        if i + 1 < n_ifaces { out = out + ", "; }
+        i = i + 1;
+    }
+    out = out + "],\n  \"services\": [";
+
+    let n_services: Int = list_len(z.services);
+    let mut s_idx: Int = 0;
+    while s_idx < n_services {
+        out = out + "\"" + json_str_escape(list_get(z.services, s_idx)) + "\"";
+        if s_idx + 1 < n_services { out = out + ", "; }
+        s_idx = s_idx + 1;
+    }
+    out = out + "],\n  \"ports\": [";
+
+    let n_ports: Int = list_len(z.ports);
+    let mut p_idx: Int = 0;
+    while p_idx < n_ports {
+        let p: PortSpec = list_get(z.ports, p_idx);
+        out = out + "{\"port\": " + p.port.to_string() + ", \"protocol\": \"" + p.protocol + "\"}";
+        if p_idx + 1 < n_ports { out = out + ", "; }
+        p_idx = p_idx + 1;
+    }
+    out = out + "]\n}\n";
+    return out;
+}
+
+pub fn render_all_zones_json(zones: List[ZoneConfig]) -> String {
+    let mut out: String = "{\n  \"zones\": [\n";
+    let n: Int = list_len(zones);
+    let mut i: Int = 0;
+    while i < n {
+        let z: ZoneConfig = list_get(zones, i);
+        out = out + "    {\"name\": \"" + z.name + "\", \"target\": \"" + z.target + "\", \"ports_count\": " + list_len(z.ports).to_string() + "}";
+        if i + 1 < n { out = out + ",\n"; } else { out = out + "\n"; }
+        i = i + 1;
+    }
+    out = out + "  ]\n}\n";
+    return out;
+}
+
+pub fn render_audit_report_json(findings: List[AuditFinding]) -> String {
+    let mut out: String = "{\n  \"findings\": [\n";
+    let n: Int = list_len(findings);
+    let mut i: Int = 0;
+    while i < n {
+        let f: AuditFinding = list_get(findings, i);
+        out = out + "    {\"severity\": \"" + f.severity + "\", \"check\": \"" + f.check_name + "\", \"detail\": \"" + json_str_escape(f.detail) + "\", \"passed\": " + (if f.passed { "true" } else { "false" }) + "}";
+        if i + 1 < n { out = out + ",\n"; } else { out = out + "\n"; }
+        i = i + 1;
+    }
+    out = out + "  ]\n}\n";
+    return out;
+}
+
+pub fn render_planned_change_json(zone_name: String, action: String, target: String) -> String {
+    return "{\n"
+        + "  \"zone\": \"" + json_str_escape(zone_name) + "\",\n"
+        + "  \"action\": \"" + json_str_escape(action) + "\",\n"
+        + "  \"target\": \"" + json_str_escape(target) + "\",\n"
+        + "  \"status\": \"planned\",\n"
+        + "  \"requires_firewalld_reload\": true\n"
+        + "}\n";
+}

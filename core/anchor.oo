@@ -1,0 +1,108 @@
+// # Core Subsystem Anchor
+//
+// Logline: Unit tests for firewall zone models, firewalld XML generation, nftables rules, and auditing.
+//
+// Setup: Pure verification of packet filtering configurations and declarative translations.
+//
+// Beats:
+//   1. Verify zone and port structure initializations.
+//   2. Verify firewalld XML serialization and tag attributes.
+//   3. Verify nftables ruleset compilation and packet verdicts.
+//   4. Verify security benchmark audit evaluation.
+
+import "core/firewall_model.oo";
+import "core/firewalld_generator.oo";
+import "core/nftables_generator.oo";
+import "core/firewall_auditor.oo";
+
+fn str_contains(s: String, needle: String) -> Bool {
+    let n_len: Int = chars_len(needle);
+    let s_len: Int = chars_len(s);
+    if n_len > s_len {
+        return false;
+    }
+    let mut i: Int = 0;
+    while i + n_len <= s_len {
+        if str_slice(s, i, i + n_len) == needle {
+            return true;
+        }
+        i = i + 1;
+    }
+    return false;
+}
+
+fn test_models_and_xml() -> Bool {
+    let pub_z: ZoneConfig = make_public_zone();
+    if pub_z.name != "public" || list_len(pub_z.ports) < 2 {
+        return false;
+    }
+
+    let xml: String = generate_zone_xml(pub_z);
+    if !str_contains(xml, "<zone") || !str_contains(xml, "<short>public</short>") {
+        return false;
+    }
+    if !str_contains(xml, "<service name=\"ssh\"/>") || !str_contains(xml, "<service name=\"cockpit\"/>") {
+        return false;
+    }
+    if !str_contains(xml, "<port port=\"22\" protocol=\"tcp\"/>") {
+        return false;
+    }
+
+    return true;
+}
+
+fn test_nftables_translation() -> Bool {
+    let mut zones: List[ZoneConfig] = list_new();
+    zones = list_push(zones, make_public_zone());
+
+    let nft: String = generate_nftables_ruleset(zones);
+    if !str_contains(nft, "table inet filter") {
+        return false;
+    }
+    if !str_contains(nft, "chain input") || !str_contains(nft, "policy drop") {
+        return false;
+    }
+    if !str_contains(nft, "tcp dport 22 accept") || !str_contains(nft, "tcp dport 9090 accept") {
+        return false;
+    }
+    if !str_contains(nft, "ct state established,related accept") {
+        return false;
+    }
+
+    return true;
+}
+
+fn test_security_audit() -> Bool {
+    let mut zones: List[ZoneConfig] = list_new();
+    zones = list_push(zones, make_public_zone());
+
+    let findings: List[AuditFinding] = audit_firewall_configuration(zones);
+    if list_len(findings) < 4 {
+        return false;
+    }
+
+    let mut found_cockpit: Bool = false;
+    let mut i: Int = 0;
+    while i < list_len(findings) {
+        let f: AuditFinding = list_get(findings, i);
+        if f.check_name == "cockpit_console_service" && f.passed {
+            found_cockpit = true;
+        }
+        i = i + 1;
+    }
+
+    return found_cockpit;
+}
+
+pub fn run_core_tests() -> Bool {
+    if !test_models_and_xml() {
+        return false;
+    }
+    if !test_nftables_translation() {
+        return false;
+    }
+    if !test_security_audit() {
+        return false;
+    }
+    return true;
+}

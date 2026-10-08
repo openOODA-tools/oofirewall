@@ -1,0 +1,89 @@
+// # Firewall Domain Model
+//
+// Logline: Data structures representing firewalld zones, nftables chains, ports, and rules.
+//
+// Setup: Pure memory domain models adhering to Linux networking and packet filtering semantics.
+//
+// Beats:
+//   1. Define PortSpec, ServiceSpec, and RuleSpec structures.
+//   2. Define ZoneConfig representing firewalld and nftables zones.
+//   3. Implement constructor and helper methods for default zones.
+//   4. Deliver structured rule models for packet inspection engines.
+
+pub type PortSpec = struct {
+    port: Int,
+    protocol: String
+};
+
+pub type RuleSpec = struct {
+    action: String, // "accept", "drop", "reject"
+    protocol: String, // "tcp", "udp", "icmp", "all"
+    source_cidr: String,
+    port: Int,
+    rate_limit: String // e.g. "10/minute"
+};
+
+pub type ZoneConfig = struct {
+    name: String,
+    target: String, // "default", "ACCEPT", "%%REJECT%%", "DROP"
+    short_desc: String,
+    interfaces: List[String],
+    sources: List[String],
+    services: List[String],
+    ports: List[PortSpec],
+    rules: List[RuleSpec]
+};
+
+pub fn make_port(port: Int, proto: String) -> PortSpec {
+    return PortSpec {
+        port: port,
+        protocol: proto
+    };
+}
+
+pub fn make_rule(action: String, proto: String, source: String, port: Int, limit: String) -> RuleSpec {
+    return RuleSpec {
+        action: action,
+        protocol: proto,
+        source_cidr: source,
+        port: port,
+        rate_limit: limit
+    };
+}
+
+pub fn make_empty_zone(name: String, target: String, desc: String) -> ZoneConfig {
+    return ZoneConfig {
+        name: name,
+        target: target,
+        short_desc: desc,
+        interfaces: list_new(),
+        sources: list_new(),
+        services: list_new(),
+        ports: list_new(),
+        rules: list_new()
+    };
+}
+
+pub fn make_public_zone() -> ZoneConfig {
+    let mut z: ZoneConfig = make_empty_zone("public", "default", "For use in public areas.");
+    z.interfaces = list_push(z.interfaces, "eth0");
+    z.services = list_push(z.services, "ssh");
+    z.services = list_push(z.services, "cockpit");
+    z.services = list_push(z.services, "dhcpv6-client");
+    z.ports = list_push(z.ports, make_port(22, "tcp"));
+    z.ports = list_push(z.ports, make_port(9090, "tcp")); // Cockpit socket
+    return z;
+}
+
+pub fn make_trusted_zone() -> ZoneConfig {
+    let mut z: ZoneConfig = make_empty_zone("trusted", "ACCEPT", "All network connections are accepted.");
+    z.interfaces = list_push(z.interfaces, "lo");
+    z.sources = list_push(z.sources, "127.0.0.1/8");
+    z.sources = list_push(z.sources, "::1/128");
+    return z;
+}
+
+pub fn make_drop_zone() -> ZoneConfig {
+    let mut z: ZoneConfig = make_empty_zone("drop", "DROP", "Any incoming packets are dropped without notification.");
+    return z;
+}
